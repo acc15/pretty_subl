@@ -23,7 +23,7 @@ class ForEachRegionTransform:
             except:
                 # traceback.print_exc()
                 pass
-        # raise ValueError
+        return None
 
     def run(self, edit, **kwargs):
         selection = self.view.sel()
@@ -34,12 +34,10 @@ class ForEachRegionTransform:
         
         for region in regions:
             text = self.view.substr(region)
-            try:
-                decoded = self.transform(text, kwargs)
-                if decoded is not None:
-                    self.view.replace(edit, region, decoded)
-            except:
-                traceback.print_exc()
+            decoded = self.transform(text, kwargs)
+            if decoded is not None:
+                self.view.replace(edit, region, decoded)
+
 
 class JsonQuoteCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
     def format_json(self, value, **kwargs):
