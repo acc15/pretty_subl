@@ -9,31 +9,29 @@ import re
 class ForEachRegionTransform:
 
     default_params = { "indent": 4 }
-    
-    def transform(self, value, params):
-        merged_params = { **self.default_params, **params }
-        for fmt in self.formatters:
+
+    def format(self, text, params):
+        for formatter in self.formatters:
             try:
-                fmt_value = fmt(value, **merged_params)
-                print("formatted with " + fmt.__name__)
-                return fmt_value
+                fmt = formatter(text, **params)
+                print("formatted with " + formatter.__name__)
+                return fmt           
             except:
                 # traceback.print_exc()
                 pass
-        return None
 
-    def run(self, edit, **kwargs):
-        selection = self.view.sel()
-        regions = selection
+    def run(self, edit, **params):
+        regions = self.view.sel()
         
         if len(regions) == 0 or (len(regions) == 1 and regions[0].empty()):
             regions = [ sublime.Region(0, self.view.size()) ]
         
+        merged_params = { **self.default_params, **params }
         for region in regions:
             text = self.view.substr(region)
-            decoded = self.transform(text, kwargs)
-            if decoded is not None:
-                self.view.replace(edit, region, decoded)
+            formatted = self.format(text, merged_params)
+            if formatted is not None:
+                self.view.replace(edit, region, formatted)
 
 
 class JsonQuoteCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
@@ -45,21 +43,9 @@ class UglyPrintCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
 class PrettyPrintCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
     formatters = [prettify_xml, prettify_json]
 
-xml_prolog_re = "^\\s*(<\\?\\s*xml.*\\?>)\\s*"
-
-def get_xml_prolog(xml):
-    m = re.search(xml_prolog_re, xml)
-    return m.group(1) + "\n" if m else ""
-
-def strip_xml_prolog(xml):
-    m = re.search(xml_prolog_re, xml)
-    return xml[:m.start()] + xml[m.end():] if m else xml
-
-def get_xml_lines(xml, dom_formatter):
-    dom = md.parseString(xml)
-    formatted_xml = dom_formatter(dom)
-    final_xml = get_xml_prolog(xml) + strip_xml_prolog(formatted_xml)
-    return final_xml.splitlines()
+#
+# Formatters
+#
 
 def uglify_xml(value, **kwargs):
     xml_lines = get_xml_lines(value, lambda dom: dom.toxml())
@@ -81,4 +67,23 @@ def prettify_json(value, indent, **kwargs):
 
 def json_quote(value, **kwargs):
     return json.dumps(value, ensure_ascii = False)
-    
+
+#
+# XML utilities
+#
+
+xml_prolog_re = "^\\s*(<\\?\\s*xml.*\\?>)\\s*"
+
+def get_xml_prolog(xml):
+    m = re.search(xml_prolog_re, xml)
+    return m.group(1) + "\n" if m else ""
+
+def strip_xml_prolog(xml):
+    m = re.search(xml_prolog_re, xml)
+    return xml[:m.start()] + xml[m.end():] if m else xml
+
+def get_xml_lines(xml, dom_formatter):
+    dom = md.parseString(xml)
+    formatted_xml = dom_formatter(dom)
+    final_xml = get_xml_prolog(xml) + strip_xml_prolog(formatted_xml)
+    return final_xml.splitlines()
