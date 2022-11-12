@@ -4,6 +4,7 @@ import traceback
 import json
 import xml.dom.minidom as md
 import os
+import re
 
 class ForEachRegionTransform:
 
@@ -45,8 +46,8 @@ class JsonQuoteCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
 
 class UglyPrintCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
     def format_xml(self, value, **kwargs):
-        el = md.parseString(value)
-        return "".join([line.strip() for line in el.toxml().splitlines()])
+        xml = XmlUtils.format_xml(value, lambda dom: dom.toxml())
+        return "".join([line.strip() for line in xml.splitlines()])
 
     def format_json(self, value, **kwargs):
         parsed = json.loads(value)
@@ -54,9 +55,8 @@ class UglyPrintCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
 
 class PrettyPrintCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
     def format_xml(self, value, indent):
-        el = md.parseString(value)
-        pretty_xml = el.toprettyxml(indent = " " * indent)
-        return os.linesep.join([s for s in pretty_xml.splitlines() if s.strip()])
+        xml = XmlUtils.format_xml(value, lambda dom: dom.toprettyxml(indent = " " * indent))
+        return os.linesep.join([s for s in xml.splitlines() if s.strip()])
 
     def format_json(self, value, indent):
         parsed = json.loads(value)
@@ -64,3 +64,19 @@ class PrettyPrintCommand(ForEachRegionTransform, sublime_plugin.TextCommand):
             return parsed
         return json.dumps(parsed, ensure_ascii = False, indent = indent)
         
+
+class XmlUtils:
+    xml_prolog_re = "^\\s*(<\\?\\s*xml.*\\?>)\\s*"
+
+    def get_xml_prolog(xml):
+        m = re.search(xml_prolog_re, xml)
+        return m.group(1) + "\n" if m else ""
+
+    def strip_xml_prolog(xml):
+        m = re.search(xml_prolog_re, xml)
+        return xml[:m.start()] + xml[m.end():] if m else xml
+
+    def format_xml(xml, dom_formatter):
+        dom = md.parseString(xml)
+        formatted_xml = dom_formatter(dom)
+        return get_xml_prolog(xml) + strip_xml_prolog(formatted_xml)
